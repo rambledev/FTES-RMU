@@ -1,65 +1,148 @@
-import Image from "next/image";
+import Link from 'next/link'
+import { prisma } from '@/lib/prisma'
 
-export default function Home() {
+async function getStats() {
+  const [students, instructors, subjects, responses, activeTerm] = await Promise.all([
+    prisma.student.count(),
+    prisma.instructor.count(),
+    prisma.subject.count(),
+    prisma.response.count(),
+    prisma.term.findFirst({ where: { isActive: true } }),
+  ])
+  return { students, instructors, subjects, responses, activeTerm }
+}
+
+export default async function Home() {
+  const stats = await getStats()
+
+  const quickLinks = [
+    {
+      href: '/student',
+      title: 'ประเมินการสอน',
+      desc: 'กรอกแบบประเมินอาจารย์ผู้สอนในภาคการศึกษาปัจจุบัน',
+      icon: '📝',
+      color: 'bg-blue-600 hover:bg-blue-700',
+    },
+    {
+      href: '/dashboard/instructor',
+      title: 'รายงานผู้สอน',
+      desc: 'ดูผลการประเมินเฉลี่ยของอาจารย์แต่ละท่าน',
+      icon: '👨‍🏫',
+      color: 'bg-green-600 hover:bg-green-700',
+    },
+    {
+      href: '/dashboard/department',
+      title: 'รายงานสาขา',
+      desc: 'เปรียบเทียบผลการประเมินระดับสาขา',
+      icon: '🏛️',
+      color: 'bg-purple-600 hover:bg-purple-700',
+    },
+    {
+      href: '/dashboard/faculty',
+      title: 'รายงานคณะ',
+      desc: 'ภาพรวมผลการประเมินระดับคณะ',
+      icon: '🎓',
+      color: 'bg-orange-600 hover:bg-orange-700',
+    },
+    {
+      href: '/dashboard/subject',
+      title: 'รายงานรายวิชา',
+      desc: 'ผลการประเมินแยกตามรายวิชา',
+      icon: '📚',
+      color: 'bg-teal-600 hover:bg-teal-700',
+    },
+    {
+      href: '/admin/form-builder',
+      title: 'จัดการแบบฟอร์ม',
+      desc: 'สร้างและแก้ไขแบบประเมินการสอน',
+      icon: '⚙️',
+      color: 'bg-gray-600 hover:bg-gray-700',
+    },
+  ]
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="space-y-8">
+      {/* Header Banner */}
+      <div className="bg-gradient-to-r from-blue-800 to-blue-600 rounded-2xl p-8 text-white">
+        <div className="flex items-start justify-between flex-wrap gap-4">
+          <div>
+            <h1 className="text-3xl font-bold">ระบบประเมินการสอน</h1>
+            <p className="text-blue-200 mt-1 text-lg">
+              Faculty Teaching Evaluation System — มหาวิทยาลัยเทคโนโลยีราชมงคล
+            </p>
+            {stats.activeTerm && (
+              <div className="mt-3 inline-flex items-center gap-2 bg-white/20 rounded-full px-4 py-1.5">
+                <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                <span className="text-sm font-medium">ภาคการศึกษาที่ {stats.activeTerm.label} (ภาคเรียนปัจจุบัน)</span>
+              </div>
+            )}
+          </div>
+          <div className="text-right">
+            <div className="text-5xl font-bold">{stats.responses}</div>
+            <div className="text-blue-200 text-sm">การประเมินทั้งหมด</div>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        {/* Stats row */}
+        <div className="grid grid-cols-3 gap-4 mt-6">
+          <div className="bg-white/15 rounded-xl p-4 text-center">
+            <div className="text-2xl font-bold">{stats.students}</div>
+            <div className="text-blue-200 text-sm mt-1">นักศึกษา</div>
+          </div>
+          <div className="bg-white/15 rounded-xl p-4 text-center">
+            <div className="text-2xl font-bold">{stats.instructors}</div>
+            <div className="text-blue-200 text-sm mt-1">อาจารย์</div>
+          </div>
+          <div className="bg-white/15 rounded-xl p-4 text-center">
+            <div className="text-2xl font-bold">{stats.subjects}</div>
+            <div className="text-blue-200 text-sm mt-1">รายวิชา</div>
+          </div>
         </div>
-      </main>
+      </div>
+
+      {/* Quick Links */}
+      <div>
+        <h2 className="text-xl font-bold text-gray-800 mb-4">เข้าใช้งานระบบ</h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          {quickLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className={`${link.color} text-white rounded-xl p-5 transition-all hover:shadow-lg hover:-translate-y-0.5 block`}
+            >
+              <div className="text-3xl mb-2">{link.icon}</div>
+              <div className="font-bold">{link.title}</div>
+              <div className="text-sm opacity-80 mt-1">{link.desc}</div>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      {/* Demo Flow Guide */}
+      <div className="bg-white rounded-2xl border border-gray-200 p-6">
+        <h2 className="text-xl font-bold text-gray-800 mb-4">วิธีใช้งานระบบ (Demo Flow)</h2>
+        <div className="flex flex-wrap gap-2 items-center">
+          {[
+            { step: '1', label: 'ไปที่ /student', icon: '👤' },
+            { step: '2', label: 'คลิก "ประเมิน"', icon: '📝' },
+            { step: '3', label: 'กรอกแบบประเมิน', icon: '✅' },
+            { step: '4', label: 'ดู Dashboard', icon: '📊' },
+          ].map((item, i, arr) => (
+            <div key={item.step} className="flex items-center gap-2">
+              <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                <span className="text-lg">{item.icon}</span>
+                <div>
+                  <div className="text-xs text-blue-500 font-medium">ขั้นตอน {item.step}</div>
+                  <div className="text-sm font-semibold text-blue-800">{item.label}</div>
+                </div>
+              </div>
+              {i < arr.length - 1 && (
+                <span className="text-gray-400 text-xl">→</span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
-  );
+  )
 }

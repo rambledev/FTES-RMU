@@ -1,0 +1,166 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Student {
+  id           String     @id @default(cuid())
+  studentId    String     @unique
+  name         String
+  email        String     @unique
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id])
+  responses    Response[]
+  createdAt    DateTime   @default(now())
+}
+
+model Instructor {
+  id           String                        @id @default(cuid())
+  name         String
+  email        String                        @unique
+  title        String
+  departmentId String
+  department   Department                    @relation(fields: [departmentId], references: [id])
+  assignments  TeachingAssignment[]
+  summaries    InstructorEvaluationSummary[]
+  createdAt    DateTime                      @default(now())
+}
+
+model Faculty {
+  id          String       @id @default(cuid())
+  name        String
+  nameEn      String
+  code        String       @unique
+  departments Department[]
+  createdAt   DateTime     @default(now())
+}
+
+model Department {
+  id          String       @id @default(cuid())
+  name        String
+  nameEn      String
+  code        String       @unique
+  facultyId   String
+  faculty     Faculty      @relation(fields: [facultyId], references: [id])
+  instructors Instructor[]
+  students    Student[]
+  subjects    Subject[]
+  createdAt   DateTime     @default(now())
+}
+
+model Subject {
+  id           String               @id @default(cuid())
+  code         String               @unique
+  name         String
+  nameEn       String
+  credits      Int
+  departmentId String
+  department   Department           @relation(fields: [departmentId], references: [id])
+  assignments  TeachingAssignment[]
+  createdAt    DateTime             @default(now())
+}
+
+model Term {
+  id          String                        @id @default(cuid())
+  year        Int
+  semester    Int
+  label       String
+  isActive    Boolean                       @default(false)
+  assignments TeachingAssignment[]
+  responses   Response[]
+  summaries   InstructorEvaluationSummary[]
+  createdAt   DateTime                      @default(now())
+
+  @@unique([year, semester])
+}
+
+model TeachingAssignment {
+  id           String     @id @default(cuid())
+  subjectId    String
+  instructorId String
+  termId       String
+  subject      Subject    @relation(fields: [subjectId], references: [id])
+  instructor   Instructor @relation(fields: [instructorId], references: [id])
+  term         Term       @relation(fields: [termId], references: [id])
+  responses    Response[]
+  createdAt    DateTime   @default(now())
+
+  @@unique([subjectId, instructorId, termId])
+}
+
+model EvaluationForm {
+  id          String     @id @default(cuid())
+  title       String
+  description String?
+  isActive    Boolean    @default(true)
+  sections    Section[]
+  responses   Response[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Section {
+  id        String         @id @default(cuid())
+  title     String
+  order     Int
+  formId    String
+  form      EvaluationForm @relation(fields: [formId], references: [id])
+  questions Question[]
+  createdAt DateTime       @default(now())
+}
+
+model Question {
+  id        String   @id @default(cuid())
+  text      String
+  type      String
+  order     Int
+  required  Boolean  @default(true)
+  sectionId String
+  section   Section  @relation(fields: [sectionId], references: [id])
+  answers   Answer[]
+  createdAt DateTime @default(now())
+}
+
+model Response {
+  id                   String             @id @default(cuid())
+  studentId            String
+  teachingAssignmentId String
+  formId               String
+  termId               String
+  student              Student            @relation(fields: [studentId], references: [id])
+  teachingAssignment   TeachingAssignment @relation(fields: [teachingAssignmentId], references: [id])
+  form                 EvaluationForm     @relation(fields: [formId], references: [id])
+  term                 Term               @relation(fields: [termId], references: [id])
+  answers              Answer[]
+  createdAt            DateTime           @default(now())
+
+  @@unique([studentId, teachingAssignmentId])
+}
+
+model Answer {
+  id         String   @id @default(cuid())
+  responseId String
+  questionId String
+  valueInt   Int?
+  valueText  String?
+  response   Response @relation(fields: [responseId], references: [id])
+  question   Question @relation(fields: [questionId], references: [id])
+  createdAt  DateTime @default(now())
+}
+
+model InstructorEvaluationSummary {
+  id            String     @id @default(cuid())
+  instructorId  String
+  termId        String
+  avgScore      Float
+  responseCount Int
+  instructor    Instructor @relation(fields: [instructorId], references: [id])
+  term          Term       @relation(fields: [termId], references: [id])
+  updatedAt     DateTime   @updatedAt
+
+  @@unique([instructorId, termId])
+}
