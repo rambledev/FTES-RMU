@@ -1,47 +1,59 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
+import { getSession } from '@/lib/session'
 
-// Mock: current logged-in student is student ID 6501001 (index 0 in seed)
-const MOCK_STUDENT_ID_CODE = '6501001'
-
-async function getStudentData() {
+async function getStudentData(studentId: string) {
   const student = await prisma.student.findUnique({
-    where: { studentId: MOCK_STUDENT_ID_CODE },
+    where: { id: studentId },
     include: { department: { include: { faculty: true } } },
   })
   if (!student) return null
 
   const activeTerm = await prisma.term.findFirst({ where: { isActive: true } })
-  if (!activeTerm) return { student, assignments: [], activeTerm: null }
+  if (!activeTerm) return { student, enrollments: [], activeTerm: null }
 
-  // Get all teaching assignments for the active term
-  const assignments = await prisma.teachingAssignment.findMany({
-    where: { termId: activeTerm.id },
+  // Get only enrolled teaching assignments for this student in the active term
+  const enrollments = await prisma.enrollment.findMany({
+    where: {
+      studentId: student.id,
+      teachingAssignment: { termId: activeTerm.id },
+    },
     include: {
-      subject: { include: { department: true } },
-      instructor: true,
-      term: true,
-      responses: {
-        where: { studentId: student.id },
-        select: { id: true },
+      teachingAssignment: {
+        include: {
+          subject: { include: { department: true } },
+          instructor: true,
+          term: true,
+          responses: {
+            where: { studentId: student.id },
+            select: { id: true },
+          },
+        },
       },
     },
-    orderBy: { subject: { code: 'asc' } },
+    orderBy: { teachingAssignment: { subject: { code: 'asc' } } },
   })
 
-  return { student, assignments, activeTerm }
+  return { student, enrollments, activeTerm }
 }
 
 export default async function StudentPage() {
-  const data = await getStudentData()
+  const session = await getSession()
+  if (!session) redirect('/login')
+  if (session.role !== 'STUDENT') redirect('/')
+  if (!session.student) {
+    return <div className="text-center py-20 text-gray-500">ไม่พบข้อมูลนักศึกษาที่เชื่อมกับบัญชีนี้</div>
+  }
 
+  const data = await getStudentData(session.student.id)
   if (!data?.student) {
     return <div className="text-center py-20 text-gray-500">ไม่พบข้อมูลนักศึกษา</div>
   }
 
-  const { student, assignments, activeTerm } = data
-  const completed = assignments.filter((a) => a.responses.length > 0).length
-  const total = assignments.length
+  const { student, enrollments, activeTerm } = data
+  const completed = enrollments.filter((e) => e.teachingAssignment.responses.length > 0).length
+  const total = enrollments.length
   const progress = total > 0 ? Math.round((completed / total) * 100) : 0
 
   return (
@@ -78,10 +90,7 @@ export default async function StudentPage() {
             <span className="font-bold text-blue-700">{completed} / {total} รายวิชา ({progress}%)</span>
           </div>
           <div className="w-full bg-gray-100 rounded-full h-3">
-            <div
-              className="bg-blue-600 rounded-full h-3 transition-all"
-              style={{ width: `${progress}%` }}
-            />
+            <div className="bg-blue-600 rounded-full h-3 transition-all" style={{ width: `${progress}%` }} />
           </div>
         </div>
       </div>
@@ -96,10 +105,10 @@ export default async function StudentPage() {
           </div>
         </div>
 
-        {assignments.length === 0 ? (
+        {enrollments.length === 0 ? (
           <div className="text-center py-16 text-gray-400">
             <div className="text-4xl mb-2">📋</div>
-            <p>ไม่มีรายวิชาในภาคการศึกษานี้</p>
+            <p>ไม่มีรายวิชาที่ลงทะเบียนในภาคการศึกษานี้</p>
           </div>
         ) : (
           <table className="w-full">
@@ -114,10 +123,11 @@ export default async function StudentPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {assignments.map((a) => {
+              {enrollments.map((e) => {
+                const a = e.teachingAssignment
                 const done = a.responses.length > 0
                 return (
-                  <tr key={a.id} className="hover:bg-gray-50 transition-colors">
+                  <tr key={e.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4">
                       <span className="font-mono text-sm font-semibold text-gray-700 bg-gray-100 px-2 py-0.5 rounded">
                         {a.subject.code}

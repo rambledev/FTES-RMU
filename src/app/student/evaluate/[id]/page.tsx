@@ -1,16 +1,10 @@
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
+import { getSession } from '@/lib/session'
 import EvaluateForm from './EvaluateForm'
 
-const MOCK_STUDENT_ID_CODE = '6501001'
-
-async function getData(assignmentId: string) {
-  const student = await prisma.student.findUnique({
-    where: { studentId: MOCK_STUDENT_ID_CODE },
-  })
-  if (!student) return null
-
+async function getData(assignmentId: string, studentId: string) {
   const assignment = await prisma.teachingAssignment.findUnique({
     where: { id: assignmentId },
     include: {
@@ -21,34 +15,41 @@ async function getData(assignmentId: string) {
   })
   if (!assignment) return null
 
+  // Check enrollment
+  const enrollment = await prisma.enrollment.findUnique({
+    where: { studentId_teachingAssignmentId: { studentId, teachingAssignmentId: assignmentId } },
+  })
+  if (!enrollment) return null // not enrolled
+
   // Check if already evaluated
   const existing = await prisma.response.findUnique({
-    where: { studentId_teachingAssignmentId: { studentId: student.id, teachingAssignmentId: assignmentId } },
+    where: { studentId_teachingAssignmentId: { studentId, teachingAssignmentId: assignmentId } },
   })
-  if (existing) return { alreadyDone: true, assignment, student }
+  if (existing) return { alreadyDone: true, assignment }
 
-  // Get active evaluation form
   const form = await prisma.evaluationForm.findFirst({
     where: { isActive: true },
     include: {
       sections: {
         orderBy: { order: 'asc' },
-        include: {
-          questions: { orderBy: { order: 'asc' } },
-        },
+        include: { questions: { orderBy: { order: 'asc' } } },
       },
     },
   })
   if (!form) return null
 
-  return { alreadyDone: false, assignment, student, form }
+  return { alreadyDone: false, assignment, form }
 }
 
 export default async function EvaluatePage({ params }: { params: { id: string } }) {
-  const data = await getData(params.id)
+  const session = await getSession()
+  if (!session) redirect('/login')
+  if (session.role !== 'STUDENT' || !session.student) redirect('/student')
+
+  const data = await getData(params.id, session.student.id)
   if (!data) notFound()
 
-  const { alreadyDone, assignment, student, form } = data
+  const { alreadyDone, assignment, form } = data
 
   if (alreadyDone) {
     return (
@@ -67,14 +68,12 @@ export default async function EvaluatePage({ params }: { params: { id: string } 
 
   return (
     <div className="max-w-3xl mx-auto space-y-4">
-      {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-gray-500">
         <Link href="/student" className="hover:text-blue-600">รายวิชาของฉัน</Link>
         <span>›</span>
         <span className="text-gray-900 font-medium">ประเมินการสอน</span>
       </div>
 
-      {/* Assignment Header */}
       <div className="bg-white rounded-2xl border border-gray-200 p-6">
         <div className="flex items-start gap-4">
           <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -99,18 +98,16 @@ export default async function EvaluatePage({ params }: { params: { id: string } 
             </div>
           </div>
         </div>
-
         <div className="mt-4 p-3 bg-yellow-50 border border-yellow-100 rounded-xl text-sm text-yellow-800">
           <strong>หมายเหตุ:</strong> ข้อมูลการประเมินจะถูกเก็บเป็นความลับ และไม่สามารถแก้ไขหลังส่งแล้วได้
         </div>
       </div>
 
-      {/* Evaluation Form */}
       <EvaluateForm
         assignmentId={assignment.id}
         formId={form!.id}
         termId={assignment.term.id}
-        studentId={student.id}
+        studentId={session.student.id}
         sections={form!.sections}
       />
     </div>

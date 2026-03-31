@@ -7,15 +7,40 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Student {
-  id           String     @id @default(cuid())
-  studentId    String     @unique
+enum Role {
+  STUDENT
+  TEACHER
+  EXECUTIVE_DEAN
+  EXECUTIVE_HEAD
+  ADMIN
+}
+
+model User {
+  id           String      @id @default(cuid())
+  email        String      @unique
   name         String
-  email        String     @unique
+  role         Role        @default(STUDENT)
+  facultyId    String?
+  departmentId String?
+  faculty      Faculty?    @relation(fields: [facultyId], references: [id])
+  department   Department? @relation(fields: [departmentId], references: [id])
+  student      Student?
+  instructor   Instructor?
+  createdAt    DateTime    @default(now())
+}
+
+model Student {
+  id           String       @id @default(cuid())
+  studentId    String       @unique
+  name         String
+  email        String       @unique
+  userId       String?      @unique
   departmentId String
-  department   Department @relation(fields: [departmentId], references: [id])
+  department   Department   @relation(fields: [departmentId], references: [id])
+  user         User?        @relation(fields: [userId], references: [id])
   responses    Response[]
-  createdAt    DateTime   @default(now())
+  enrollments  Enrollment[]
+  createdAt    DateTime     @default(now())
 }
 
 model Instructor {
@@ -23,8 +48,10 @@ model Instructor {
   name         String
   email        String                        @unique
   title        String
+  userId       String?                       @unique
   departmentId String
   department   Department                    @relation(fields: [departmentId], references: [id])
+  user         User?                         @relation(fields: [userId], references: [id])
   assignments  TeachingAssignment[]
   summaries    InstructorEvaluationSummary[]
   createdAt    DateTime                      @default(now())
@@ -36,6 +63,7 @@ model Faculty {
   nameEn      String
   code        String       @unique
   departments Department[]
+  users       User[]
   createdAt   DateTime     @default(now())
 }
 
@@ -49,6 +77,7 @@ model Department {
   instructors Instructor[]
   students    Student[]
   subjects    Subject[]
+  users       User[]
   createdAt   DateTime     @default(now())
 }
 
@@ -79,17 +108,29 @@ model Term {
 }
 
 model TeachingAssignment {
-  id           String     @id @default(cuid())
+  id           String       @id @default(cuid())
   subjectId    String
   instructorId String
   termId       String
-  subject      Subject    @relation(fields: [subjectId], references: [id])
-  instructor   Instructor @relation(fields: [instructorId], references: [id])
-  term         Term       @relation(fields: [termId], references: [id])
+  subject      Subject      @relation(fields: [subjectId], references: [id])
+  instructor   Instructor   @relation(fields: [instructorId], references: [id])
+  term         Term         @relation(fields: [termId], references: [id])
   responses    Response[]
-  createdAt    DateTime   @default(now())
+  enrollments  Enrollment[]
+  createdAt    DateTime     @default(now())
 
   @@unique([subjectId, instructorId, termId])
+}
+
+model Enrollment {
+  id                   String             @id @default(cuid())
+  studentId            String
+  teachingAssignmentId String
+  student              Student            @relation(fields: [studentId], references: [id])
+  teachingAssignment   TeachingAssignment @relation(fields: [teachingAssignmentId], references: [id])
+  createdAt            DateTime           @default(now())
+
+  @@unique([studentId, teachingAssignmentId])
 }
 
 model EvaluationForm {
